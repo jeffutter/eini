@@ -13,6 +13,19 @@ import (
 
 var write bool
 
+func prepareEncrypter(pubKey string) *crypto.Encrypter {
+	var pub [32]byte
+
+	pubkey, _ := hex.DecodeString(pubKey)
+	copy(pub[:], pubkey)
+
+	var myKP crypto.Keypair
+	if err := myKP.Generate(); err != nil {
+		fmt.Printf("Failed to generate Keypair: %s", err)
+	}
+	return myKP.Encrypter(pub)
+}
+
 // encryptCmd represents the encrypt command
 var encryptCmd = &cobra.Command{
 	Use:   "encrypt",
@@ -29,8 +42,6 @@ to quickly create a Cobra application.`,
 		encryptedRegex, _ := regexp.Compile("^EJ\\[.*\\]")
 		decryptedRegex, _ := regexp.Compile("(?i)decrypted")
 
-		var pub [32]byte
-
 		file := args[0]
 
 		cfg, err := ini.Load(file)
@@ -44,15 +55,8 @@ to quickly create a Cobra application.`,
 			fmt.Printf("Couldn't read public key from ini: %s", err)
 			return
 		}
-		pubkey, _ := hex.DecodeString(pubKey.Value())
-		copy(pub[:], pubkey)
 
-		var myKP crypto.Keypair
-		if err = myKP.Generate(); err != nil {
-			fmt.Printf("Failed to generate Keypair: %s", err)
-			return
-		}
-		encrypter := myKP.Encrypter(pub)
+		encrypter := prepareEncrypter(pubKey.Value())
 
 		for _, sec := range cfg.SectionStrings() {
 			section, err := cfg.GetSection(sec)
