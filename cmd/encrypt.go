@@ -1,9 +1,8 @@
 package cmd
 
 import (
-	"encoding/hex"
 	"fmt"
-	"github.com/Shopify/ejson/crypto"
+	"github.com/jeffutter/eyaml/crypto"
 	"github.com/spf13/cobra"
 	"gopkg.in/ini.v1"
 	"io"
@@ -12,19 +11,6 @@ import (
 )
 
 var write bool
-
-func prepareEncrypter(pubKey string) *crypto.Encrypter {
-	var pub [32]byte
-
-	pubkey, _ := hex.DecodeString(pubKey)
-	copy(pub[:], pubkey)
-
-	var myKP crypto.Keypair
-	if err := myKP.Generate(); err != nil {
-		fmt.Printf("Failed to generate Keypair: %s", err)
-	}
-	return myKP.Encrypter(pub)
-}
 
 // encryptCmd represents the encrypt command
 var encryptCmd = &cobra.Command{
@@ -56,7 +42,11 @@ to quickly create a Cobra application.`,
 			return
 		}
 
-		encrypter := prepareEncrypter(pubKey.Value())
+		encrypter, err := crypto.PrepareEncrypter(pubKey.Value())
+		if err != nil {
+			fmt.Printf("Error setting up Crypto: %s\n", err)
+			return
+		}
 
 		for _, sec := range cfg.SectionStrings() {
 			section, err := cfg.GetSection(sec)

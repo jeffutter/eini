@@ -2,9 +2,8 @@ package cmd
 
 import (
 	"bufio"
-	"encoding/hex"
 	"fmt"
-	"github.com/Shopify/ejson/crypto"
+	"github.com/jeffutter/eyaml/crypto"
 	"github.com/spf13/cobra"
 	"gopkg.in/ini.v1"
 	"os"
@@ -13,37 +12,6 @@ import (
 )
 
 var output string
-
-func prepareDecrypter(pubKey string, privKey string) *crypto.Decrypter {
-	var priv [32]byte
-	var pub [32]byte
-
-	pubkey, _ := hex.DecodeString(pubKey)
-	privkey, _ := hex.DecodeString(privKey)
-
-	copy(pub[:], pubkey)
-	copy(priv[:], privkey)
-
-	myKP := crypto.Keypair{
-		Public:  pub,
-		Private: priv,
-	}
-	return myKP.Decrypter()
-}
-
-func decrypt(decrypter *crypto.Decrypter, s string) string {
-	encryptedRegex, _ := regexp.Compile("^EJ\\[.*\\]")
-
-	if encryptedRegex.MatchString(s) {
-		decrypted, err := decrypter.Decrypt([]byte(s))
-		if err != nil {
-			fmt.Printf("Decryption Error: %v - %v\n", err, s)
-		}
-		return fmt.Sprintf("%s", decrypted)
-	} else {
-		return s
-	}
-}
 
 // decryptCmd represents the decrypt command
 var decryptCmd = &cobra.Command{
@@ -79,7 +47,11 @@ to quickly create a Cobra application.`,
 			return
 		}
 
-		decrypter := prepareDecrypter(pubkey.Value(), privKey)
+		decrypter, err := crypto.PrepareDecrypter(pubkey.Value(), privKey)
+		if err != nil {
+			fmt.Printf("Error setting up Crypto: %s\n", err)
+			return
+		}
 
 		for _, sec := range cfg.SectionStrings() {
 			section, err := cfg.GetSection(sec)
@@ -90,10 +62,15 @@ to quickly create a Cobra application.`,
 			for _, key := range section.KeyStrings() {
 				if !ignoreKeyRegex.MatchString(key) {
 					val := section.Key(key).Value()
+					decrypted, err := crypto.Decrypt(decrypter, val)
+					if err != nil {
+						fmt.Printf("Failed decrypting key: %s\n", sec)
+						return
+					}
 					if sec == "DEFAULT" {
-						fmt.Printf("declare -x \"%s\"=\"%s\"\n", key, decrypt(decrypter, val))
+						fmt.Printf("declare -x \"%s\"=\"%s\"\n", key, decrypted)
 					} else {
-						fmt.Printf("declare -x \"%s_%s\"=\"%s\"\n", strings.ToUpper(sec), key, decrypt(decrypter, val))
+						fmt.Printf("declare -x \"%s_%s\"=\"%s\"\n", strings.ToUpper(sec), key, decrypted)
 					}
 				}
 			}
