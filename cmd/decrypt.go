@@ -1,85 +1,47 @@
 package cmd
 
 import (
-	"fmt"
-
-	"github.com/spf13/cobra"
-
 	"bufio"
 	"encoding/hex"
+	"fmt"
 	"github.com/Shopify/ejson/crypto"
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
+	"github.com/spf13/cobra"
+	"gopkg.in/ini.v1"
 	"os"
-	"reflect"
 	"regexp"
+	"strings"
 )
 
 var output string
 var privKey string
 
-func flatten_yaml(val interface{}) map[string]string {
-	var output = make(map[string]string)
-	switch reflect.TypeOf(val).Kind() {
-	case reflect.Map:
-		var m = reflect.ValueOf(val).Interface().(map[interface{}]interface{})
-		for k, v := range m {
-			var key string
-			switch reflect.TypeOf(k).Kind() {
-			case reflect.String:
-				key = reflect.ValueOf(k).Interface().(string)
-			}
+func decrypt(pubKey string, s string) string {
+	encryptedRegex, _ := regexp.Compile("^EJ\\[.*\\]")
 
-			switch reflect.TypeOf(v).Kind() {
-			case reflect.String:
-				var s = reflect.ValueOf(v).Interface().(string)
-				output[key] = s
-			case reflect.Map:
-				o := flatten_yaml(reflect.ValueOf(v).Interface())
-				for sk, sv := range o {
-					output[key+"_"+sk] = sv
-				}
-			default:
-				fmt.Printf("Unknown Type: %v", reflect.TypeOf(v))
-			}
-		}
-	}
-	return output
-}
-
-func out(data map[string]string) {
 	var priv [32]byte
 	var pub [32]byte
 
-	encryptedRegex, _ := regexp.Compile("^EJ\\[.*\\]")
-	ignoreKeyRegex, _ := regexp.Compile("^_.*")
+	if encryptedRegex.MatchString(s) {
 
-	pubKey := data["_public_key"]
+		pubkey, _ := hex.DecodeString(pubKey)
+		privkey, _ := hex.DecodeString(privKey)
 
-	pubkey, _ := hex.DecodeString(pubKey)
-	privkey, _ := hex.DecodeString(privKey)
+		copy(pub[:], pubkey)
+		copy(priv[:], privkey)
 
-	copy(pub[:], pubkey)
-	copy(priv[:], privkey)
-
-	myKP := crypto.Keypair{
-		Public:  pub,
-		Private: priv,
-	}
-	decrypter := myKP.Decrypter()
-
-	for k, v := range data {
-		if !ignoreKeyRegex.MatchString(k) {
-			if encryptedRegex.MatchString(v) {
-				decrypted, err := decrypter.Decrypt([]byte(v))
-				if err != nil {
-					fmt.Printf("Decryption Error: %v - %v\n", err, v)
-				}
-				fmt.Printf("declare -x \"%s\"=\"%s\"\n", k, decrypted)
-			} else {
-				fmt.Printf("declare -x \"%s\"=\"%s\"\n", k, v)
-			}
+		myKP := crypto.Keypair{
+			Public:  pub,
+			Private: priv,
 		}
+		decrypter := myKP.Decrypter()
+
+		decrypted, err := decrypter.Decrypt([]byte(s))
+		if err != nil {
+			fmt.Printf("Decryption Error: %v - %v\n", err, s)
+		}
+		return fmt.Sprintf("%s", decrypted)
+	} else {
+		return s
 	}
 }
 
@@ -95,20 +57,45 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		ignoreKeyRegex, _ := regexp.Compile("^_.*")
+
 		reader := bufio.NewReader(os.Stdin)
 		privKey, _ = reader.ReadString('\n')
 
-		b, err := ioutil.ReadFile(args[0])
-		if err != nil {
-			fmt.Print(err)
+		if privKey == "" {
+			fmt.Printf("Private key not provided, aborting")
+			return
 		}
 
-		var val interface{}
-		err = yaml.Unmarshal(b, &val)
+		cfg, err := ini.Load(args[0])
 		if err != nil {
-			fmt.Println("unmarshal []byte to yaml failed: " + err.Error())
+			fmt.Printf("Fail to read file %s: %v", args[0], err)
+			return
 		}
-		out(flatten_yaml(val))
+
+		pubkey, err := cfg.Section("").GetKey("_public_key")
+		if err != nil {
+			fmt.Printf("Couldn't read public key from ini")
+			return
+		}
+
+		for _, sec := range cfg.SectionStrings() {
+			section, err := cfg.GetSection(sec)
+			if err != nil {
+				fmt.Printf("Failed parsing ini section %s\n", sec)
+				return
+			}
+			for _, key := range section.KeyStrings() {
+				if !ignoreKeyRegex.MatchString(key) {
+					val := section.Key(key).Value()
+					if sec == "DEFAULT" {
+						fmt.Printf("declare -x \"%s\"=\"%s\"\n", key, decrypt(pubkey.Value(), val))
+					} else {
+						fmt.Printf("declare -x \"%s_%s\"=\"%s\"\n", strings.ToUpper(sec), key, decrypt(pubkey.Value(), val))
+					}
+				}
+			}
+		}
 	},
 }
 
