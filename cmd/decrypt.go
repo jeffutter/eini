@@ -1,17 +1,18 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/jeffutter/eyaml/crypto"
 	"github.com/spf13/cobra"
 	"gopkg.in/ini.v1"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
 )
 
 var output string
+var keydir string
 
 // decryptCmd represents the decrypt command
 var decryptCmd = &cobra.Command{
@@ -27,14 +28,6 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ignoreKeyRegex, _ := regexp.Compile("^_.*")
 
-		reader := bufio.NewReader(os.Stdin)
-		privKey, _ := reader.ReadString('\n')
-
-		if privKey == "" {
-			fmt.Printf("Private key not provided, aborting")
-			return
-		}
-
 		cfg, err := ini.Load(args[0])
 		if err != nil {
 			fmt.Printf("Fail to read file %s: %v", args[0], err)
@@ -45,6 +38,28 @@ to quickly create a Cobra application.`,
 		if err != nil {
 			fmt.Printf("Couldn't read public key from ini")
 			return
+		}
+
+		stdinContent, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to read from stdin:", err)
+			os.Exit(1)
+		}
+
+		privKey := strings.TrimSpace(string(stdinContent))
+
+		if privKey == "" {
+			privKey, err = readPrivateKeyFromDisk(pubkey.Value(), keydir)
+
+			if err != nil {
+				fmt.Printf("Error reading private key from disk: %s", err)
+				return
+			}
+
+			if privKey == "" {
+				fmt.Printf("Private key not provided, aborting")
+				return
+			}
 		}
 
 		decrypter, err := crypto.PrepareDecrypter(pubkey.Value(), privKey)
@@ -78,7 +93,20 @@ to quickly create a Cobra application.`,
 	},
 }
 
+func readPrivateKeyFromDisk(pubkey string, keydir string) (privkey string, err error) {
+	keyFile := fmt.Sprintf("%s/%s", keydir, pubkey)
+	var fileContents []byte
+	fileContents, err = ioutil.ReadFile(keyFile)
+	if err != nil {
+		err = fmt.Errorf("couldn't read key file (%s)", err.Error())
+		return
+	}
+	privkey = string(fileContents)
+	return privkey, nil
+}
+
 func init() {
 	rootCmd.AddCommand(decryptCmd)
 	decryptCmd.Flags().StringVarP(&output, "output", "o", "env", "output format: [env, yaml]")
+	decryptCmd.Flags().StringVarP(&keydir, "keydir", "k", "/opt/ejson/keys", "Directory containing EJSON keys")
 }

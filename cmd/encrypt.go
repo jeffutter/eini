@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"runtime"
 )
 
 var write bool
@@ -24,6 +25,9 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		// Encryption is expensive. We'd rather burn cycles on many cores than wait.
+		runtime.GOMAXPROCS(runtime.NumCPU())
+
 		ignoreKeyRegex, _ := regexp.Compile("^_.*")
 		encryptedRegex, _ := regexp.Compile("^EJ\\[.*\\]")
 		decryptedRegex, _ := regexp.Compile("(?i)decrypted")
