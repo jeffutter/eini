@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/jeffutter/eyaml/crypto"
+	"github.com/jeffutter/eini/crypto"
 	"github.com/spf13/cobra"
 	"gopkg.in/ini.v1"
 	"io/ioutil"

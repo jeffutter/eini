@@ -1,6 +1,6 @@
 package main
 
-import "github.com/jeffutter/eyaml/cmd"
+import "github.com/jeffutter/eini/cmd"
 
 func main() {
 	cmd.Execute()
