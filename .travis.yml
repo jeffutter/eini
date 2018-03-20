@@ -1,5 +1,10 @@
 language: go
 
+addons:
+  apt:
+    packages:
+    - upx-ucl
+
 script:
   - go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d .)

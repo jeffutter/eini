@@ -1,10 +1,13 @@
 builds:
   - binary: eini
+    ldflags: -s -w -X=github.com/jeffutter/eini.version={{.Version}}
     goos:
       - darwin
       - linux
     goarch:
       - amd64
+    hooks:
+      post: ./upx.sh
 archive:
   name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
   replacements:
