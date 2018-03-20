@@ -11,6 +11,14 @@ import (
 type Decrypter = *ejsonCrypto.Decrypter
 type Encrypter = *ejsonCrypto.Encrypter
 
+func GenerateKeypair() (string, string, error) {
+	var kp ejsonCrypto.Keypair
+	if err := kp.Generate(); err != nil {
+		return "", "", err
+	}
+	return kp.PublicString(), kp.PrivateString(), nil
+}
+
 func PrepareDecrypter(pubKey string, privKey string) (Decrypter, error) {
 	var priv [32]byte
 	var pub [32]byte
