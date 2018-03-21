@@ -66,7 +66,7 @@ private key passed to stdin or in the keydir.`,
 			keys := sec.GetKeys()
 			for _, key := range keys {
 				if !ignoreKeyRegex.MatchString(key.Name()) {
-					decrypted, err := crypto.Decrypt(decrypter, key.Value())
+					decrypted, err := decrypter.Decrypt(key.Value())
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "Failed decrypting key: %s\n", sec.Name())
 						os.Exit(1)

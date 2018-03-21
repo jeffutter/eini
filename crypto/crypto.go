@@ -7,8 +7,12 @@ import (
 	"regexp"
 )
 
-type Decrypter = *ejsonCrypto.Decrypter
-type Encrypter = *ejsonCrypto.Encrypter
+type Decrypter struct {
+	decrypter *ejsonCrypto.Decrypter
+}
+type Encrypter struct {
+	encrypter *ejsonCrypto.Encrypter
+}
 
 func GenerateKeypair() (string, string, error) {
 	var kp ejsonCrypto.Keypair
@@ -24,7 +28,7 @@ func PrepareDecrypter(pubKey string, privKey string) (Decrypter, error) {
 
 	pubkey, err := hex.DecodeString(pubKey)
 	if err != nil {
-		return nil, fmt.Errorf("Error Decoding Public Key: %s", err)
+		return Decrypter{}, fmt.Errorf("Error Decoding Public Key: %s", err)
 	}
 
 	privkey, _ := hex.DecodeString(privKey)
@@ -40,7 +44,15 @@ func PrepareDecrypter(pubKey string, privKey string) (Decrypter, error) {
 		Public:  pub,
 		Private: priv,
 	}
-	return myKP.Decrypter(), nil
+	return Decrypter{myKP.Decrypter()}, nil
+}
+
+func (encrypter Encrypter) Encrypt(s string) (string, error) {
+	encrypted, err := encrypter.encrypter.Encrypt([]byte(s))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s", encrypted), nil
 }
 
 func PrepareEncrypter(pubKey string) (Encrypter, error) {
@@ -48,22 +60,22 @@ func PrepareEncrypter(pubKey string) (Encrypter, error) {
 
 	pubkey, err := hex.DecodeString(pubKey)
 	if err != nil {
-		return nil, err
+		return Encrypter{}, err
 	}
 	copy(pub[:], pubkey)
 
 	var myKP ejsonCrypto.Keypair
 	if err := myKP.Generate(); err != nil {
-		return nil, fmt.Errorf("Failed to generate Keypair: %s", err)
+		return Encrypter{}, fmt.Errorf("Failed to generate Keypair: %s", err)
 	}
-	return myKP.Encrypter(pub), nil
+	return Encrypter{myKP.Encrypter(pub)}, nil
 }
 
-func Decrypt(decrypter Decrypter, s string) (string, error) {
+func (decrypter Decrypter) Decrypt(s string) (string, error) {
 	encryptedRegex, _ := regexp.Compile("^EJ\\[.*\\]")
 
 	if encryptedRegex.MatchString(s) {
-		decrypted, err := decrypter.Decrypt([]byte(s))
+		decrypted, err := decrypter.decrypter.Decrypt([]byte(s))
 		if err != nil {
 			return "", err
 		}

@@ -46,12 +46,12 @@ public key contained in the _public_key entry.`,
 		for _, sec := range cfg.GetSections() {
 			for _, key := range sec.GetKeys() {
 				if shouldEncrypt(key) {
-					encrypted, err := encrypter.Encrypt([]byte(key.Value()))
+					encrypted, err := encrypter.Encrypt(key.Value())
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "Failed encrypting key: %s\n", key.Name())
 						os.Exit(1)
 					}
-					key.SetValue(fmt.Sprintf("%s", encrypted))
+					key.SetValue(encrypted)
 				}
 			}
 		}
