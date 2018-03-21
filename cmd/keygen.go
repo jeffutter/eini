@@ -11,13 +11,9 @@ import (
 // keygenCmd represents the encrypt command
 var keygenCmd = &cobra.Command{
 	Use:   "keygen",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Generates a public key / private key pair",
+	Long: `Generates a public key / private key pair used
+to encrypt and decrypt eini files.`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		pub, priv, err := crypto.GenerateKeypair()
