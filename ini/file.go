@@ -7,19 +7,19 @@ import (
 )
 
 type File struct {
-	cfg  *goIni.File
-	path string
+	cfg    *goIni.File
+	source interface{}
 }
 
-func Load(path string) (File, error) {
-	cfg, err := goIni.Load(path)
-	return File{cfg, path}, err
+func Load(source interface{}) (File, error) {
+	cfg, err := goIni.Load(source)
+	return File{cfg, source}, err
 }
 
 func (file File) PubKey() (string, error) {
 	pubkey, err := file.cfg.Section("").GetKey("_public_key")
 	if err != nil {
-		return "", fmt.Errorf("Couldn't read public key from ini - %s: %s", file.path, err)
+		return "", fmt.Errorf("Couldn't read public key from ini - %v: %s", file.source, err)
 	}
 	return pubkey.Value(), nil
 }
