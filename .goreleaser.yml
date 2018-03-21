@@ -8,8 +8,6 @@ builds:
       - linux
     goarch:
       - amd64
-    hooks:
-      post: ./upx.sh
 archive:
   name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
   replacements:
