@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	ejsonCrypto "github.com/Shopify/ejson/crypto"
 	"regexp"
@@ -25,7 +24,7 @@ func PrepareDecrypter(pubKey string, privKey string) (Decrypter, error) {
 
 	pubkey, err := hex.DecodeString(pubKey)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error Decoding Public Key: %s", err))
+		return nil, fmt.Errorf("Error Decoding Public Key: %s", err)
 	}
 
 	privkey, _ := hex.DecodeString(privKey)
@@ -55,7 +54,7 @@ func PrepareEncrypter(pubKey string) (Encrypter, error) {
 
 	var myKP ejsonCrypto.Keypair
 	if err := myKP.Generate(); err != nil {
-		return nil, errors.New(fmt.Sprintf("Failed to generate Keypair: %s", err))
+		return nil, fmt.Errorf("Failed to generate Keypair: %s", err)
 	}
 	return myKP.Encrypter(pub), nil
 }

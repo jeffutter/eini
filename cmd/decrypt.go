@@ -3,11 +3,10 @@ package cmd
 import (
 	"fmt"
 	"github.com/jeffutter/eini/crypto"
+	"github.com/jeffutter/eini/ini"
 	"github.com/spf13/cobra"
-	"gopkg.in/ini.v1"
 	"io/ioutil"
 	"os"
-	"regexp"
 	"strings"
 )
 
@@ -22,18 +21,17 @@ var decryptCmd = &cobra.Command{
 private key passed to stdin or in the keydir.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		ignoreKeyRegex, _ := regexp.Compile("^_.*")
 
 		cfg, err := ini.Load(args[0])
 		if err != nil {
-			fmt.Printf("Fail to read file %s: %v", args[0], err)
-			return
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 
-		pubkey, err := cfg.Section("").GetKey("_public_key")
+		pubkey, err := cfg.PubKey()
 		if err != nil {
-			fmt.Printf("Couldn't read public key from ini")
-			return
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 
 		stdinContent, err := ioutil.ReadAll(os.Stdin)
@@ -45,43 +43,38 @@ private key passed to stdin or in the keydir.`,
 		privKey := strings.TrimSpace(string(stdinContent))
 
 		if privKey == "" {
-			privKey, err = readPrivateKeyFromDisk(pubkey.Value(), keydir)
+			privKey, err = readPrivateKeyFromDisk(pubkey, keydir)
 
 			if err != nil {
-				fmt.Printf("Error reading private key from disk: %s", err)
-				return
+				fmt.Fprintf(os.Stderr, "Error reading private key from disk: %s", err)
+				os.Exit(1)
 			}
 
 			if privKey == "" {
-				fmt.Printf("Private key not provided, aborting")
-				return
+				fmt.Fprintf(os.Stderr, "Private key not provided, aborting")
+				os.Exit(1)
 			}
 		}
 
-		decrypter, err := crypto.PrepareDecrypter(pubkey.Value(), privKey)
+		decrypter, err := crypto.PrepareDecrypter(pubkey, privKey)
 		if err != nil {
-			fmt.Printf("Error setting up Crypto: %s\n", err)
-			return
+			fmt.Fprintf(os.Stderr, "Error setting up Crypto: %s\n", err)
+			os.Exit(1)
 		}
 
-		for _, sec := range cfg.SectionStrings() {
-			section, err := cfg.GetSection(sec)
-			if err != nil {
-				fmt.Printf("Failed parsing ini section %s\n", sec)
-				return
-			}
-			for _, key := range section.KeyStrings() {
-				if !ignoreKeyRegex.MatchString(key) {
-					val := section.Key(key).Value()
-					decrypted, err := crypto.Decrypt(decrypter, val)
+		for _, sec := range cfg.GetSections() {
+			keys := sec.GetKeys()
+			for _, key := range keys {
+				if !ignoreKeyRegex.MatchString(key.Name()) {
+					decrypted, err := crypto.Decrypt(decrypter, key.Value())
 					if err != nil {
-						fmt.Printf("Failed decrypting key: %s\n", sec)
-						return
+						fmt.Fprintf(os.Stderr, "Failed decrypting key: %s\n", sec.Name())
+						os.Exit(1)
 					}
-					if sec == "DEFAULT" {
-						fmt.Printf("declare -x \"%s\"=\"%s\"\n", key, decrypted)
+					if sec.Name() == "DEFAULT" {
+						fmt.Printf("declare -x \"%s\"=\"%s\"\n", key.Name(), decrypted)
 					} else {
-						fmt.Printf("declare -x \"%s_%s\"=\"%s\"\n", strings.ToUpper(sec), key, decrypted)
+						fmt.Printf("declare -x \"%s_%s\"=\"%s\"\n", strings.ToUpper(sec.Name()), key.Name(), decrypted)
 					}
 				}
 			}
@@ -103,6 +96,6 @@ func readPrivateKeyFromDisk(pubkey string, keydir string) (privkey string, err e
 
 func init() {
 	rootCmd.AddCommand(decryptCmd)
-	decryptCmd.Flags().StringVarP(&output, "output", "o", "env", "output format: [env, yaml]")
+	decryptCmd.Flags().StringVarP(&output, "output", "o", "env", "output format: [env]")
 	decryptCmd.Flags().StringVarP(&keydir, "keydir", "k", "/opt/ejson/keys", "Directory containing EJSON keys")
 }

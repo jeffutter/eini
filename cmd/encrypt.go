@@ -3,11 +3,10 @@ package cmd
 import (
 	"fmt"
 	"github.com/jeffutter/eini/crypto"
+	"github.com/jeffutter/eini/ini"
 	"github.com/spf13/cobra"
-	"gopkg.in/ini.v1"
 	"io"
 	"os"
-	"regexp"
 	"runtime"
 )
 
@@ -24,50 +23,35 @@ public key contained in the _public_key entry.`,
 		// Encryption is expensive. We'd rather burn cycles on many cores than wait.
 		runtime.GOMAXPROCS(runtime.NumCPU())
 
-		ignoreKeyRegex, _ := regexp.Compile("^_.*")
-		encryptedRegex, _ := regexp.Compile("^EJ\\[.*\\]")
-		decryptedRegex, _ := regexp.Compile("(?i)decrypted")
-
 		file := args[0]
 
 		cfg, err := ini.Load(file)
 		if err != nil {
-			fmt.Printf("Fail to read file %s: %v", args[0], err)
-			return
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 
-		pubKey, err := cfg.Section("").GetKey("_public_key")
+		pubkey, err := cfg.PubKey()
 		if err != nil {
-			fmt.Printf("Couldn't read public key from ini: %s", err)
-			return
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 
-		encrypter, err := crypto.PrepareEncrypter(pubKey.Value())
+		encrypter, err := crypto.PrepareEncrypter(pubkey)
 		if err != nil {
-			fmt.Printf("Error setting up Crypto: %s\n", err)
-			return
+			fmt.Fprintf(os.Stderr, "Error setting up Crypto: %s\n", err)
+			os.Exit(1)
 		}
 
-		for _, sec := range cfg.SectionStrings() {
-			section, err := cfg.GetSection(sec)
-			if err != nil {
-				fmt.Printf("Failed parsing ini section %s\n", sec)
-				return
-			}
-			for _, key := range section.KeyStrings() {
-				if !ignoreKeyRegex.MatchString(key) {
-					val := section.Key(key)
-					if !decryptedRegex.MatchString(val.Comment) {
-						v := val.Value()
-						if !encryptedRegex.MatchString(v) {
-							encrypted, err := encrypter.Encrypt([]byte(v))
-							if err != nil {
-								fmt.Printf("Failed encrypting key: %s\n", key)
-								return
-							}
-							val.SetValue(fmt.Sprintf("%s", encrypted))
-						}
+		for _, sec := range cfg.GetSections() {
+			for _, key := range sec.GetKeys() {
+				if shouldEncrypt(key) {
+					encrypted, err := encrypter.Encrypt([]byte(key.Value()))
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Failed encrypting key: %s\n", key.Name())
+						os.Exit(1)
 					}
+					key.SetValue(fmt.Sprintf("%s", encrypted))
 				}
 			}
 		}
@@ -76,8 +60,8 @@ public key contained in the _public_key entry.`,
 		if write {
 			f, err := os.Create(file)
 			if err != nil {
-				fmt.Printf("Unable to open file %s for writing: %s\n", file, err)
-				return
+				fmt.Fprintf(os.Stderr, "Unable to open file %s for writing: %s\n", file, err)
+				os.Exit(1)
 			}
 			output = f
 			defer f.Close()
@@ -88,10 +72,14 @@ public key contained in the _public_key entry.`,
 		_, err = cfg.WriteTo(output)
 
 		if err != nil {
-			fmt.Printf("Failed to write config: %s\n", err)
-			return
+			fmt.Fprintf(os.Stderr, "Failed to write config: %s\n", err)
+			os.Exit(1)
 		}
 	},
+}
+
+func shouldEncrypt(key ini.Key) bool {
+	return !ignoreKeyRegex.MatchString(key.Name()) && !decryptedRegex.MatchString(key.Comment()) && !encryptedRegex.MatchString(key.Value())
 }
 
 func init() {
