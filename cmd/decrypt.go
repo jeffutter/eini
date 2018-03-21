@@ -71,11 +71,13 @@ private key passed to stdin or in the keydir.`,
 						fmt.Fprintf(os.Stderr, "Failed decrypting key: %s\n", sec.Name())
 						os.Exit(1)
 					}
+					var keyName string
 					if sec.Name() == "DEFAULT" {
-						fmt.Printf("declare -x \"%s\"=\"%s\"\n", key.Name(), decrypted)
+						keyName = key.Name()
 					} else {
-						fmt.Printf("declare -x \"%s_%s\"=\"%s\"\n", strings.ToUpper(sec.Name()), key.Name(), decrypted)
+						keyName = fmt.Sprintf("%s_%s", strings.ToUpper(sec.Name()), key.Name())
 					}
+					fmt.Printf("if [ -z ${%s+x} ]; then\n    declare -x \"%s\"=\"%s\"\nfi\n", keyName, keyName, decrypted)
 				}
 			}
 		}

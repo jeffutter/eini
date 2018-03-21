@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -e
+
+check_eini () {
+    if ! [ -x "$(command -v eini)" ]; then
+        echo 'Error: eini is not installed.' >&2
+        exit 1
+    fi
+}
+
+check_eini_private_key () {
+    if [ -z "${EINI_PRIVATE_KEY}" ]; then
+        echo "EINI_PRIVATE_KEY not set, exiting." >&2
+        exit 1
+    fi
+}
+
+check_eini_file () {
+    env_file_name="$1"
+
+    if [ -f "$env_file_name" ]; then
+        return 0
+    else
+        echo "$env_file_name not found, not loading environment."
+        return 1
+    fi
+}
+
+main () {
+    env_file="$1"
+    shift
+
+    check_eini
+    if check_eini_file "$env_file"; then
+        check_eini_private_key
+
+        echo "${EINI_PRIVATE_KEY}" | eini decrypt "$env_file" > /tmp/env
+        . /tmp/env
+        rm /tmp/env
+        env -u EINI_PRIVATE_KEY "$@"
+    else
+        "$@"
+    fi
+}
+
+main "$@"

@@ -1,6 +1,8 @@
 builds:
   - binary: eini
     ldflags: -s -w -X=github.com/jeffutter/eini.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
     goos:
       - darwin
       - linux
@@ -19,3 +21,7 @@ archive:
   format_overrides:
     - goos: windows
       format: zip
+  files:
+    - LICENSE
+    - README.md
+    - load_eini_env
