@@ -1,6 +1,6 @@
 builds:
   - binary: eini
-    ldflags: -s -w -X=github.com/jeffutter/eini.version={{.Version}}
+    ldflags: -s -w -X=github.com/jeffutter/eini/cmd.version={{.Version}}
     env:
       - CGO_ENABLED=0
     goos:

@@ -1,9 +1,11 @@
 language: go
+go:
+  - "1.10"
 
 addons:
   apt:
     packages:
-    - upx-ucl
+      - upx-ucl
 
 script:
   - go get -t -v ./...
@@ -13,9 +15,9 @@ script:
 
 # calls goreleaser
 deploy:
-- provider: script
-  skip_cleanup: true
-  script: curl -sL http://git.io/goreleaser | bash
-  on:
-    tags: true
-    condition: $TRAVIS_OS_NAME = linux
+  - provider: script
+    skip_cleanup: true
+    script: curl -sL http://git.io/goreleaser | bash
+    on:
+      tags: true
+      condition: $TRAVIS_OS_NAME = linux
