@@ -27,8 +27,12 @@ check_eini_file () {
 }
 
 main () {
-    env_file="$1"
-    shift
+    if [ -z "${EINI_ENV}" ]; then
+        env_file="$1"
+        shift
+    else
+        env_file="${EINI_ENV}"
+    fi
 
     check_eini
     if check_eini_file "$env_file"; then
