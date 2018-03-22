@@ -1,5 +1,7 @@
 # eini
 
+[![Build Status](https://travis-ci.org/jeffutter/eini.svg?branch=master)](https://travis-ci.org/jeffutter/eini)
+
 `eini` is a utility for managing a collection of secrets in source control. The
 secrets are encrypted using [public
 key](http://en.wikipedia.org/wiki/Public-key_cryptography), [elliptic
