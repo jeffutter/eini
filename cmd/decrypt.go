@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"github.com/jeffutter/eini/crypto"
 	"github.com/jeffutter/eini/ini"
 	"github.com/spf13/cobra"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -23,54 +25,23 @@ private key passed to stdin or in the keydir.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		cfg, err := ini.Load(args[0])
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		checkError(err)
 
 		pubkey, err := cfg.PubKey()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		checkError(err)
 
-		stdinContent, err := ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to read from stdin:", err)
-			os.Exit(1)
-		}
-
-		privKey := strings.TrimSpace(string(stdinContent))
-
-		if privKey == "" {
-			privKey, err = readPrivateKeyFromDisk(pubkey, keydir)
-
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error reading private key from disk: %s", err)
-				os.Exit(1)
-			}
-
-			if privKey == "" {
-				fmt.Fprintf(os.Stderr, "Private key not provided, aborting")
-				os.Exit(1)
-			}
-		}
+		privKey, err := getPrivateKey(os.Stdin, pubkey)
+		checkError(err)
 
 		decrypter, err := crypto.PrepareDecrypter(pubkey, privKey)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error setting up Crypto: %s\n", err)
-			os.Exit(1)
-		}
+		checkErrorf(err, "Error setting up crypto: %s\n", err)
 
 		for _, sec := range cfg.GetSections() {
-			keys := sec.GetKeys()
-			for _, key := range keys {
+			for _, key := range sec.GetKeys() {
 				if !ignoreKeyRegex.MatchString(key.Name()) {
 					decrypted, err := decrypter.Decrypt(key.Value())
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "Failed decrypting key: %s\n", sec.Name())
-						os.Exit(1)
-					}
+					checkErrorf(err, "Failed decrypting key: %s\n", sec.Name())
+
 					var keyName string
 					if sec.Name() == "DEFAULT" {
 						keyName = key.Name()
@@ -84,14 +55,55 @@ private key passed to stdin or in the keydir.`,
 	},
 }
 
-func readPrivateKeyFromDisk(pubkey string, keydir string) (privkey string, err error) {
-	keyFile := fmt.Sprintf("%s/%s", keydir, pubkey)
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func checkErrorf(err error, str string, args ...interface{}) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, str, args...)
+		os.Exit(1)
+	}
+}
+
+func getPrivateKey(reader io.Reader, pubkey string) (string, error) {
+	var privKey string
+
+	stdinContent, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return privKey, fmt.Errorf("Failed to read from stdin: %s", err)
+	}
+
+	privKey = strings.TrimSpace(string(stdinContent))
+
+	if privKey == "" {
+		privKey, err = readPrivateKeyFromDisk(pubkey, keydir)
+		if err != nil {
+			return privKey, fmt.Errorf("Error reading private key from disk: %s", err)
+		}
+
+		if privKey == "" {
+			return privKey, errors.New("Private key not found")
+		}
+	}
+	return privKey, nil
+}
+
+func readPrivateKeyFromDisk(pubkey string, keydir string) (string, error) {
+	var privkey string
 	var fileContents []byte
+	var err error
+
+	keyFile := fmt.Sprintf("%s/%s", keydir, pubkey)
 	fileContents, err = ioutil.ReadFile(keyFile)
 	if err != nil {
-		err = fmt.Errorf("couldn't read key file (%s)", err.Error())
-		return
+		err = fmt.Errorf("Couldn't read key file (%s)", err.Error())
+		return privkey, err
 	}
+
 	privkey = string(fileContents)
 	return privkey, nil
 }

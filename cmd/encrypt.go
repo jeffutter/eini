@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/jeffutter/eini/crypto"
 	"github.com/jeffutter/eini/ini"
 	"github.com/spf13/cobra"
@@ -26,31 +25,20 @@ public key contained in the _public_key entry.`,
 		file := args[0]
 
 		cfg, err := ini.Load(file)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		checkError(err)
 
 		pubkey, err := cfg.PubKey()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		checkError(err)
 
 		encrypter, err := crypto.PrepareEncrypter(pubkey)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error setting up Crypto: %s\n", err)
-			os.Exit(1)
-		}
+		checkErrorf(err, "Error setting up Crypto: %s\n", err)
 
 		for _, sec := range cfg.GetSections() {
 			for _, key := range sec.GetKeys() {
 				if shouldEncrypt(key) {
 					encrypted, err := encrypter.Encrypt(key.Value())
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "Failed encrypting key: %s\n", key.Name())
-						os.Exit(1)
-					}
+					checkErrorf(err, "Failed encrypting key: %s\n", key.Name())
+
 					key.SetValue(encrypted)
 				}
 			}
@@ -59,10 +47,8 @@ public key contained in the _public_key entry.`,
 		var output io.Writer
 		if write {
 			f, err := os.Create(file)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Unable to open file %s for writing: %s\n", file, err)
-				os.Exit(1)
-			}
+			checkErrorf(err, "Unable to open file %s for writing: %s\n", file, err)
+
 			output = f
 			defer f.Close()
 		} else {
@@ -70,11 +56,7 @@ public key contained in the _public_key entry.`,
 		}
 
 		_, err = cfg.WriteTo(output)
-
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to write config: %s\n", err)
-			os.Exit(1)
-		}
+		checkErrorf(err, "Failed to write config: %s\n", err)
 	},
 }
 
