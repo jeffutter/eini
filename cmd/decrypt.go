@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/jeffutter/eini/crypto"
 	"github.com/jeffutter/eini/ini"
 	"github.com/spf13/cobra"
 	"io"
@@ -23,35 +22,22 @@ var decryptCmd = &cobra.Command{
 private key passed to stdin or in the keydir.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-
 		cfg, err := ini.Load(args[0])
 		checkError(err)
 
 		pubkey, err := cfg.PubKey()
 		checkError(err)
 
-		privKey, err := getPrivateKey(os.Stdin, pubkey)
+		privkey, err := getPrivateKey(os.Stdin, pubkey)
 		checkError(err)
 
-		decrypter, err := crypto.PrepareDecrypter(pubkey, privKey)
-		checkErrorf(err, "Error setting up crypto: %s\n", err)
+		output, err := cfg.Decrypt(pubkey, privkey)
+		checkError(err)
 
-		for _, sec := range cfg.GetSections() {
-			for _, key := range sec.GetKeys() {
-				if !ignoreKeyRegex.MatchString(key.Name()) {
-					decrypted, err := decrypter.Decrypt(key.Value())
-					checkErrorf(err, "Failed decrypting key: %s\n", sec.Name())
-
-					var keyName string
-					if sec.Name() == "DEFAULT" {
-						keyName = key.Name()
-					} else {
-						keyName = fmt.Sprintf("%s_%s", strings.ToUpper(sec.Name()), key.Name())
-					}
-					fmt.Printf("if [ -z ${%s+x} ]; then\n    declare -x \"%s\"=\"%s\"\nfi\n", keyName, keyName, decrypted)
-				}
-			}
+		for _, line := range output {
+			fmt.Fprintln(os.Stdout, line)
 		}
+
 	},
 }
 

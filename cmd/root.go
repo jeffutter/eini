@@ -7,13 +7,9 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"regexp"
 )
 
 var cfgFile string
-var ignoreKeyRegex = regexp.MustCompile("^_.*")
-var encryptedRegex = regexp.MustCompile("^EJ\\[.*\\]")
-var decryptedRegex = regexp.MustCompile("(?i)decrypted")
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
